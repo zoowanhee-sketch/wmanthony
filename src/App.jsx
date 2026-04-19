@@ -328,26 +328,171 @@ function ResultsScreen({ wrongIds, words, setName, score, correct, total, config
 // --- 나머지 컴포넌트 및 메인 App 컴포넌트 (변경 없음) ---
 // (전체 코드의 일관성을 위해 모두 포함합니다)
 
+// 📍 app/page.jsx 파일에서 MatchingQuiz 함수 전체를 교체하세요.
+
+// 📍📍📍 app/page.jsx 파일에서 MatchingQuiz 함수 전체를 이 코드로 교체하세요. 📍📍📍
+
+// 📍📍📍 app/page.jsx 파일에서 MatchingQuiz 함수 전체를 이 코드로 교체하세요. 📍📍📍
+
+// 📍📍📍 app/page.jsx 파일에서 MatchingQuiz 함수 전체를 이 코드로 교체하세요. 📍📍📍
+
+// 📍📍📍 제공해주신 전체 코드에서 MatchingQuiz 함수만 이걸로 완전히 교체하세요 📍📍📍
+
 function MatchingQuiz({ q, onDone }) {
     const { words } = q;
     const [koreans, setKoreans] = useState(() => shuffle(words.map(w => ({ id: w.id, text: w.korean || w.english }))));
-    const [selWord, setSelWord] = useState(null); const [pairs, setPairs] = useState({}); const [submitted, setSubmitted] = useState(false);
-    const pairOrder = useRef({});
-    const COLORS = ["rose", "orange", "amber", "lime", "teal", "cyan", "blue", "violet", "fuchsia", "pink"].map(c => ({ bg: `bg-${c}-100`, border: `border-${c}-400`, text: `text-${c}-700`, dot: `bg-${c}-400` }));
-    useEffect(() => { setKoreans(shuffle(q.words.map(w => ({ id: w.id, text: w.korean || w.english })))); setSelWord(null); setPairs({}); setSubmitted(false); pairOrder.current = {}; }, [q.id]);
-    const handleWord = wid => { if (submitted) return; if (selWord === wid) { setSelWord(null); return; } if (pairs[wid]) { delete pairOrder.current[wid]; setPairs(p => { const n = { ...p }; delete n[wid]; return n; }); } setSelWord(wid); };
-    const handleKor = kid => { if (submitted || !selWord) return; const used = Object.values(pairOrder.current); let i = 0; while (used.includes(i)) i++; pairOrder.current[selWord] = i; setPairs(p => ({ ...p, [selWord]: kid })); setSelWord(null); };
-    const getC = wid => { const i = pairOrder.current[wid]; return i !== undefined ? COLORS[i % COLORS.length] : null; };
+    const [submitted, setSubmitted] = useState(false);
+    const [selEng, setSelEng] = useState(null);
+    const [selKor, setSelKor] = useState(null);
+    const [pairs, setPairs] = useState({});
+
+    // ✅ 완전한 클래스 문자열로 미리 정의
+    const COLORS = [
+        { bg: "bg-rose-100",    border: "border-rose-400",    text: "text-rose-700",    dot: "bg-rose-400"    },
+        { bg: "bg-orange-100",  border: "border-orange-400",  text: "text-orange-700",  dot: "bg-orange-400"  },
+        { bg: "bg-amber-100",   border: "border-amber-400",   text: "text-amber-700",   dot: "bg-amber-400"   },
+        { bg: "bg-lime-100",    border: "border-lime-400",    text: "text-lime-700",    dot: "bg-lime-400"    },
+        { bg: "bg-teal-100",    border: "border-teal-400",    text: "text-teal-700",    dot: "bg-teal-400"    },
+        { bg: "bg-cyan-100",    border: "border-cyan-400",    text: "text-cyan-700",    dot: "bg-cyan-400"    },
+        { bg: "bg-blue-100",    border: "border-blue-400",    text: "text-blue-700",    dot: "bg-blue-400"    },
+        { bg: "bg-violet-100",  border: "border-violet-400",  text: "text-violet-700",  dot: "bg-violet-400"  },
+        { bg: "bg-fuchsia-100", border: "border-fuchsia-400", text: "text-fuchsia-700", dot: "bg-fuchsia-400" },
+        { bg: "bg-pink-100",    border: "border-pink-400",    text: "text-pink-700",    dot: "bg-pink-400"    },
+    ];
+
+    useEffect(() => {
+        setKoreans(shuffle(q.words.map(w => ({ id: w.id, text: w.korean || w.english }))));
+        setSelEng(null);
+        setSelKor(null);
+        setPairs({});
+        setSubmitted(false);
+    }, [q.id]);
+
+    useEffect(() => {
+        if (selEng && selKor) {
+            setPairs(p => ({ ...p, [selEng]: selKor }));
+            setSelEng(null);
+            setSelKor(null);
+        }
+    }, [selEng, selKor]);
+
+    const handleEngClick = (engId) => {
+        if (submitted) return;
+        if (pairs[engId]) {
+            setPairs(p => { const n = { ...p }; delete n[engId]; return n; });
+            setSelEng(null); setSelKor(null);
+            return;
+        }
+        setSelEng(prev => (prev === engId ? null : engId));
+    };
+
+    const handleKorClick = (korId) => {
+        if (submitted) return;
+        const engIdToRemove = Object.keys(pairs).find(key => pairs[key] === korId);
+        if (engIdToRemove) {
+            setPairs(p => { const n = { ...p }; delete n[engIdToRemove]; return n; });
+            setSelEng(null); setSelKor(null);
+            return;
+        }
+        setSelKor(prev => (prev === korId ? null : korId));
+    };
+
+    // ✅ 수정된 스타일 계산 함수
+    const getCellStyle = (id, type) => {
+        const engId = type === 'eng'
+            ? id
+            : Object.keys(pairs).find(key => pairs[key] === id);
+
+        // 짝이 있는 경우
+        if (engId && pairs[engId]) {
+            // 제출 후 정답/오답 표시
+            if (submitted) {
+                const isCorrect = pairs[engId] === engId; // engId와 korId가 같으면 정답
+                return isCorrect
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                    : "border-red-400 bg-red-50 text-red-700";
+            }
+            // 제출 전 색상 표시
+            const order = Object.keys(pairs).indexOf(engId);
+            const c = COLORS[order % COLORS.length];
+            return `${c.bg} ${c.border} ${c.text}`;
+        }
+
+        // 짝이 없는 경우 — 선택 여부
+        const isSelected =
+            (type === 'eng' && selEng === id) ||
+            (type === 'kor' && selKor === id);
+        return isSelected
+            ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+            : "border-gray-200 bg-white hover:border-indigo-300";
+    };
+
+    // ✅ 수정된 dot 정보 함수
+    const getDotInfo = (engId) => {
+        if (!pairs[engId] || submitted) return null;
+        const order = Object.keys(pairs).indexOf(engId);
+        const c = COLORS[order % COLORS.length];
+        return { dot: c.dot, num: order + 1 };
+    };
+
     const score = submitted ? words.filter(w => pairs[w.id] === w.id).length : 0;
-    return <div>
-        <div className="text-center mb-3">{selWord ? <p className="text-sm text-indigo-600 font-medium">"{words.find(w => w.id === selWord)?.english}" → click Korean meaning</p> : <p className="text-sm text-gray-400">Select an English word first</p>}</div>
-        <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="space-y-1.5"><div className="text-xs font-bold text-center text-gray-400 mb-1">English</div>{words.map(w => { const paired = pairs[w.id] !== undefined; const isSel = selWord === w.id; const c = getC(w.id); const pn = c ? Object.keys(pairOrder.current).indexOf(w.id) + 1 : null; const isOk = submitted && pairs[w.id] === w.id; const isBad = submitted && paired && !isOk; return <button key={w.id} onClick={() => handleWord(w.id)} className={`w-full px-2 py-2 rounded-xl border-2 text-xs font-medium transition-all text-left flex items-center gap-1.5 ${isOk ? "border-emerald-400 bg-emerald-50 text-emerald-800" : isBad ? "border-red-400 bg-red-50 text-red-700" : isSel ? "border-indigo-500 bg-indigo-100 text-indigo-800" : c ? `${c.border} ${c.bg} ${c.text}` : "border-gray-200 bg-white hover:border-indigo-300"}`}>{!submitted && c && <span className={`w-4 h-4 rounded-full ${c.dot} text-white text-xs flex items-center justify-center shrink-0 font-bold`}>{pn}</span>}{submitted && (isOk ? <span className="text-emerald-500 text-xs">✓</span> : isBad ? <span className="text-red-500 text-xs">✗</span> : null)}{isSel && <span className="w-4 h-4 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center shrink-0">→</span>}<span className="truncate">{w.english}</span></button>; })}</div>
-            <div className="space-y-1.5"><div className="text-xs font-bold text-center text-gray-400 mb-1">Korean</div>{koreans.map(k => { const mwid = Object.keys(pairs).find(wid => pairs[wid] === k.id); const c = mwid ? getC(mwid) : null; const isOk = submitted && mwid === k.id; const isBad = submitted && mwid && !isOk; return <button key={k.id} onClick={() => handleKor(k.id)} className={`w-full px-2 py-2 rounded-xl border-2 text-xs transition-all text-left flex items-center gap-1.5 ${isOk ? "border-emerald-400 bg-emerald-50 text-emerald-800" : isBad ? "border-red-400 bg-red-50 text-red-700" : c ? `${c.border} ${c.bg} ${c.text}` : selWord ? "border-gray-200 bg-white hover:border-indigo-400" : "border-gray-200 bg-white text-gray-600"}`}>{submitted && (isOk ? <span className="text-emerald-500 text-xs">✓</span> : isBad ? <span className="text-red-500 text-xs">✗</span> : null)}<span className="truncate">{k.text}</span></button>; })}</div>
+
+    return (
+        <div>
+            <div className="text-center mb-3 h-5">
+                {(selEng || selKor)
+                    ? <p className="text-sm text-indigo-600 font-medium">Find the matching pair</p>
+                    : <p className="text-sm text-gray-400">Select an English word first</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-center text-gray-400 mb-1">English</div>
+                    {words.map(w => {
+                        const dotInfo = getDotInfo(w.id);
+                        return (
+                            <button key={w.id} onClick={() => handleEngClick(w.id)}
+                                className={`w-full px-2 py-2 rounded-xl border-2 text-xs font-medium transition-all text-left flex items-center gap-1.5 ${getCellStyle(w.id, 'eng')}`}>
+                                {dotInfo && (
+                                    <span className={`w-4 h-4 rounded-full ${dotInfo.dot} text-white text-xs flex items-center justify-center shrink-0 font-bold`}>
+                                        {dotInfo.num}
+                                    </span>
+                                )}
+                                <span className="truncate ml-1">{w.english}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-center text-gray-400 mb-1">Korean</div>
+                    {koreans.map(k => (
+                        <button key={k.id} onClick={() => handleKorClick(k.id)}
+                            className={`w-full px-2 py-2 rounded-xl border-2 text-xs transition-all text-left flex items-center gap-1.5 ${getCellStyle(k.id, 'kor')}`}>
+                            <span className="truncate ml-1">{k.text}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {!submitted
+                ? <Btn onClick={() => setSubmitted(true)} disabled={Object.keys(pairs).length < words.length} className="w-full">
+                    Submit ({Object.keys(pairs).length}/{words.length})
+                  </Btn>
+                : <div>
+                    <div className={`text-center py-3 rounded-xl mb-3 ${score === words.length ? "bg-emerald-50" : "bg-indigo-50"}`}>
+                        <p className={`text-2xl font-bold ${score === words.length ? "text-emerald-600" : "text-indigo-600"}`}>
+                            {score}/{words.length} Correct
+                        </p>
+                    </div>
+                    <Btn onClick={() => onDone(words.map(w => ({ wid: w.id, correct: pairs[w.id] === w.id })))} className="w-full">
+                        Next →
+                    </Btn>
+                  </div>
+            }
         </div>
-        {!submitted ? <Btn onClick={() => setSubmitted(true)} disabled={Object.keys(pairs).length < words.length} className="w-full">Submit ({Object.keys(pairs).length}/{words.length})</Btn> : <div><div className={`text-center py-3 rounded-xl mb-3 ${score === words.length ? "bg-emerald-50" : "bg-indigo-50"}`}><p className={`text-2xl font-bold ${score === words.length ? "text-emerald-600" : "text-indigo-600"}`}>{score}/{words.length} Correct</p></div><Btn onClick={() => onDone(words.map(w => ({ wid: w.id, correct: pairs[w.id] === w.id })))} className="w-full">Next →</Btn></div>}
-    </div>;
+    );
 }
+
+
 
 function ResetModal({ onConfirm, onCancel }) {
     return <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"><div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"><h3 className="font-bold text-gray-900 mb-2">⚠️ Reset All Data</h3><p className="text-sm text-gray-500 mb-5">This will permanently delete all study history, bookmarks, and word selections. This cannot be undone.</p><div className="flex gap-2"><Btn onClick={onConfirm} variant="danger" className="flex-1">Reset</Btn><Btn onClick={onCancel} variant="secondary" className="flex-1">Cancel</Btn></div></div></div>;
