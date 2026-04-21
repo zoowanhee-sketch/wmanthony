@@ -101,7 +101,13 @@ function ResetModal({ onConfirm, onCancel }) {
 /* ── Word Select Screen ── */
 function WordSelectScreen({ setId, wordSel, onSave, nav }) {
   const set = SETS.find(s => s.id === setId); if (!set) return null;
-  const [sel, setSel] = useState(() => new Set(wordSel[setId] || set.words.map(w => w.id)));
+  const [sel, setSel] = useState(() => {
+  const saved = wordSel[setId];
+  if (!saved?.length) return new Set(set.words.map(w => w.id)); // 저장 없으면 전체 선택
+  const savedSet = new Set(saved);
+  // english 텍스트(신규) 또는 id(레거시) 둘 다 인식
+  return new Set(set.words.filter(w => savedSet.has(w.english) || savedSet.has(w.id)).map(w => w.id));
+});
   const toggleAll = () => sel.size === set.words.length ? setSel(new Set()) : setSel(new Set(set.words.map(w => w.id)));
   const toggle = id => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   return (
@@ -317,19 +323,15 @@ function StudyScreen({ words, setName, nav, mode, navTarget }) {
 }
 
 /* ── Results Screen ── */
+// ResultsScreen — window.confirm 제거, 버튼으로 교체
+// 아래 함수 전체를 App.jsx의 ResultsScreen과 교체하세요
+
 function ResultsScreen({ wrongIds, words, setName, score, correct, total, config, nav, bookmarks, toggleBookmark, bookmarkWords }) {
   const pct = score;
   const col = pct >= 80 ? "text-emerald-600" : pct >= 60 ? "text-yellow-500" : "text-red-500";
-  const bg = pct >= 80 ? "bg-emerald-50" : pct >= 60 ? "bg-yellow-50" : "bg-red-50";
+  const bg  = pct >= 80 ? "bg-emerald-50"   : pct >= 60 ? "bg-yellow-50"   : "bg-red-50";
   const wrongWords = words.filter(w => wrongIds.includes(w.id));
-
-  useEffect(() => {
-    if (wrongWords.length > 0 && wrongWords.some(w => !bookmarks.has(w.id))) {
-      if (window.confirm(`Add ${wrongWords.length} wrong words to bookmarks?`)) {
-        bookmarkWords(wrongWords.map(w => w.id));
-      }
-    }
-  }, []);
+  const unbookmarked = wrongWords.filter(w => !bookmarks.has(w.id));
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -338,19 +340,37 @@ function ResultsScreen({ wrongIds, words, setName, score, correct, total, config
         <p className="text-gray-500">{correct}/{total} correct</p>
         <p className="text-xs text-gray-400 mt-1">{setName}</p>
       </Card>
+
       {wrongWords.length > 0 && (
         <Card className="p-4 mb-4">
-          <h3 className="font-bold text-gray-700 mb-3">❌ Wrong Words ({wrongWords.length})</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-700">❌ Wrong Words ({wrongWords.length})</h3>
+            {unbookmarked.length > 0 && (
+              <button
+                onClick={() => bookmarkWords(unbookmarked.map(w => w.id))}
+                className="text-xs px-3 py-1.5 rounded-xl bg-yellow-50 border border-yellow-300 text-yellow-700 font-semibold hover:bg-yellow-100 transition-all"
+              >
+                🔖 Bookmark All ({unbookmarked.length})
+              </button>
+            )}
+          </div>
           <div className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
             {wrongWords.map(w => (
               <div key={w.id} className="flex items-center justify-between py-2">
-                <div><span className="font-semibold text-gray-800">{w.english}</span><span className="text-sm text-gray-500 ml-2">{w.korean}</span></div>
-                <button onClick={() => toggleBookmark(w.id)} className={`text-xl ml-3 transition-all ${bookmarks.has(w.id) ? "text-yellow-400" : "text-gray-200 hover:text-yellow-300"}`}>🔖</button>
+                <div>
+                  <span className="font-semibold text-gray-800">{w.english}</span>
+                  <span className="text-sm text-gray-500 ml-2">{w.korean}</span>
+                </div>
+                <button
+                  onClick={() => toggleBookmark(w.id)}
+                  className={`text-xl ml-3 transition-all ${bookmarks.has(w.id) ? "text-yellow-400" : "text-gray-200 hover:text-yellow-300"}`}
+                >🔖</button>
               </div>
             ))}
           </div>
         </Card>
       )}
+
       <div className="space-y-2">
         {wrongWords.length > 0 && <>
           <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 1, navTarget: "home" })} size="lg" className="w-full">📖 Study Wrong Words</Btn>
@@ -368,7 +388,13 @@ function HomeScreen({ history, weakWords, wordSel, nav, showApiKey, setShowApiKe
   const isLandscape = useOrientation();
   const [selected, setSelected] = useState([]);
   const toggle = id => { if (selected.includes(id)) { setSelected(s => s.filter(x => x !== id)); return; } setSelected(s => [...s, id]); };
-  const getSetWords = s => wordSel[s.id]?.length ? s.words.filter(w => wordSel[s.id].includes(w.id)) : s.words;
+const getSetWords = s => {
+  const saved = wordSel[s.id];
+  if (!saved?.length) return s.words;
+  const savedSet = new Set(saved);
+  // english 텍스트(신규) 또는 id(레거시) 둘 다 지원
+  return s.words.filter(w => savedSet.has(w.english) || savedSet.has(w.id));
+};
   const selectedSets = SETS.filter(s => selected.includes(s.id));
   const combinedWords = selectedSets.flatMap(s => getSetWords(s));
   const setName = selectedSets.map(s => s.name).join(" + ");
@@ -787,7 +813,17 @@ export default function App() {
   const toggleBookmark = id => { setBookmarks(prev => { const nb = new Set(prev); nb.has(id) ? nb.delete(id) : nb.add(id); DB.set("bookmarks", [...nb]); return nb; }); };
   const bookmarkWords = ids => { setBookmarks(prev => { const nb = new Set(prev); ids.forEach(id => nb.add(id)); DB.set("bookmarks", [...nb]); return nb; }); };
   const resetAll = async () => { setHistory([]); setWeakWords({}); setBookmarks(new Set()); setWordSel({}); await Promise.all([DB.set("history", []), DB.set("weak", {}), DB.set("bookmarks", []), DB.set("wordSel", {})]); setShowReset(false); };
-  const saveWordSel = async (setId, ids) => { const nws = { ...wordSel, [setId]: ids }; setWordSel(nws); await DB.set("wordSel", nws); nav("home"); };
+  const saveWordSel = async (setId, ids) => {
+  // ID 대신 english 텍스트로 저장 → 페이지 새로고침 후에도 안정적
+  const setData = SETS.find(s => s.id === setId);
+  const englishList = ids
+    .map(id => setData?.words.find(w => w.id === id)?.english)
+    .filter(Boolean);
+  const nws = { ...wordSel, [setId]: englishList };
+  setWordSel(nws);
+  await DB.set("wordSel", nws);
+  nav("home");
+};
   const nav = (s, data = {}) => { setNavData(data); setScreen(s); window.scrollTo(0, 0); };
 
   // 전체 틀린 단어 (중복 제거)
