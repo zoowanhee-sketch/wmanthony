@@ -424,19 +424,21 @@ const getSetWords = s => {
           </button>
         )}
 
-        {selected.length > 0 && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3 mb-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div><p className="text-sm font-semibold text-indigo-800">{setName}</p><p className="text-xs text-indigo-600">{combinedWords.length} words total</p></div>
-              <div className="flex gap-2 flex-wrap">
-                <button onClick={() => nav("study", { words: combinedWords, setName, mode: 1, navTarget: "home" })} className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-semibold">📖 Study 1</button>
-                <button onClick={() => nav("study", { words: combinedWords, setName, mode: 2, navTarget: "home" })} className="px-3 py-1.5 rounded-xl bg-blue-500 text-white text-xs font-semibold">🔤 Study 2</button>
-                <button onClick={() => nav("quiz_setup", { words: combinedWords, setName, allWords: combinedWords })} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold">▶ Quiz</button>
-                <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-gray-500 text-xs font-semibold">✕</button>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="mb-4" style={{ minHeight: "72px" }}>
+  {selected.length > 0 && (
+    <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div><p className="text-sm font-semibold text-indigo-800">{setName}</p><p className="text-xs text-indigo-600">{combinedWords.length} words total</p></div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => nav("study", { words: combinedWords, setName, mode: 1, navTarget: "home" })} className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-semibold">📖 Study 1</button>
+          <button onClick={() => nav("study", { words: combinedWords, setName, mode: 2, navTarget: "home" })} className="px-3 py-1.5 rounded-xl bg-blue-500 text-white text-xs font-semibold">🔤 Study 2</button>
+          <button onClick={() => nav("quiz_setup", { words: combinedWords, setName, allWords: combinedWords })} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold">▶ Quiz</button>
+          <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-gray-500 text-xs font-semibold">✕</button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
         <div className={`grid gap-2 ${isLandscape ? "grid-cols-5" : "grid-cols-3"}`}>
           {SETS.map(s => {
@@ -622,11 +624,22 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
         {q.t === 4 ? <MatchingQuiz key={q.id} q={q} onDone={handleMatchDone} /> : <>
           <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">{q.label}</span>
           <div className="text-lg font-medium text-gray-800 mt-3 mb-4 leading-relaxed">{q.q}</div>
-          {checked && (
-            <div className={`rounded-xl p-3 mb-3 border ${checked.correct ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-              {checked.correct ? <p className="font-bold text-emerald-700">✓ Correct!</p> : <><p className="font-bold text-red-700">✗ Wrong</p><p className="text-sm text-gray-700 mt-1">Answer: <strong>{q.ans}</strong></p></>}
-            </div>
-          )}
+          <div className="mb-3" style={{ minHeight: "52px" }}>
+  {checked && (
+    <div className={`rounded-xl p-3 border ${checked.correct ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+      {checked.correct
+        ? <p className="font-bold text-emerald-700">✓ Correct!</p>
+        : <><p className="font-bold text-red-700">✗ Wrong</p><p className="text-sm text-gray-700 mt-1">Answer: <strong>{q.ans}</strong></p></>}
+    </div>
+  )}
+</div>
+<div style={{ minHeight: "48px" }}>
+  {!checked
+    ? <Btn onClick={check} disabled={q.opts ? !selected : !typed.trim()} size="lg" className="w-full">Check</Btn>
+    : checked.correct
+      ? <p className="text-center text-sm text-gray-400 py-3">Moving on...</p>
+      : <Btn onClick={next} size="lg" className="w-full">Next →</Btn>}
+</div>
           {q.opts
             ? <div className="space-y-2">{q.opts.map(opt => { let cls = "border-gray-200 bg-white text-gray-800 hover:border-indigo-300"; if (checked) { if (opt === q.ans) cls = "border-emerald-400 bg-emerald-50 text-emerald-800"; else if (opt === selected) cls = "border-red-400 bg-red-50 text-red-700"; } else if (selected === opt) cls = "border-indigo-500 bg-indigo-50 text-indigo-700"; return <button key={opt} onClick={() => !checked && setSelected(opt)} className={`w-full py-2.5 px-4 rounded-xl border text-sm font-medium text-left transition-all ${cls}`}>{opt}</button>; })}</div>
             : <input autoFocus value={typed} onChange={e => !checked && setTyped(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { checked ? next() : check(); } }} disabled={!!checked} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Type the word..." />}
@@ -802,16 +815,29 @@ export default function App() {
   };
 
   const updateWeakWords = async (setId, wrongIds, allIds) => {
-    const wk = { ...weakWords };
-    if (!wk[setId]) wk[setId] = {};
-    allIds.forEach(id => { if (!wk[setId][id]) wk[setId][id] = { wrong: 0, total: 0 }; wk[setId][id].total++; });
-    wrongIds.forEach(id => { if (!wk[setId][id]) wk[setId][id] = { wrong: 0, total: 0 }; wk[setId][id].wrong++; });
-    setWeakWords(wk);
-    await DB.set("weak", wk);
-  };
+  const stored = await DB.get("weak") || {};
+  const wk = { ...stored }; // ← DB에서 최신값 읽음
+  if (!wk[setId]) wk[setId] = {};
+  allIds.forEach(id => { if (!wk[setId][id]) wk[setId][id] = { wrong: 0, total: 0 }; wk[setId][id].total++; });
+  wrongIds.forEach(id => { if (!wk[setId][id]) wk[setId][id] = { wrong: 0, total: 0 }; wk[setId][id].wrong++; });
+  setWeakWords(wk);
+  await DB.set("weak", wk);
+};
 
-  const toggleBookmark = id => { setBookmarks(prev => { const nb = new Set(prev); nb.has(id) ? nb.delete(id) : nb.add(id); DB.set("bookmarks", [...nb]); return nb; }); };
-  const bookmarkWords = ids => { setBookmarks(prev => { const nb = new Set(prev); ids.forEach(id => nb.add(id)); DB.set("bookmarks", [...nb]); return nb; }); };
+ const toggleBookmark = async id => {
+  const stored = await DB.get("bookmarks") || [];
+  const nb = new Set(stored);
+  nb.has(id) ? nb.delete(id) : nb.add(id);
+  setBookmarks(nb);
+  await DB.set("bookmarks", [...nb]);
+};
+  const bookmarkWords = async ids => {
+  const stored = await DB.get("bookmarks") || [];
+  const nb = new Set(stored);
+  ids.forEach(id => nb.add(id));
+  setBookmarks(nb);
+  await DB.set("bookmarks", [...nb]);
+};
   const resetAll = async () => { setHistory([]); setWeakWords({}); setBookmarks(new Set()); setWordSel({}); await Promise.all([DB.set("history", []), DB.set("weak", {}), DB.set("bookmarks", []), DB.set("wordSel", {})]); setShowReset(false); };
   const saveWordSel = async (setId, ids) => {
   // ID 대신 english 텍스트로 저장 → 페이지 새로고침 후에도 안정적
