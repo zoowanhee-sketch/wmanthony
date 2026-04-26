@@ -243,7 +243,49 @@ function StudyScreen({ words, setName, nav, mode, navTarget }) {
   const repeatRef = useRef(null);
   const w = words[idx];
 
+const [recResult, setRecResult] = useState(null);
+const [isRecording, setIsRecording] = useState(false);
+
+const levenshtein = (a, b) => {
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i;
+    for (let j = 1; j <= b.length; j++) {
+      const val = a[i-1] === b[j-1] ? dp[j-1] : Math.min(dp[j-1], dp[j], prev) + 1;
+      dp[j-1] = prev; prev = val;
+    }
+    dp[b.length] = prev;
+  }
+  return dp[b.length];
+};
+
+const calcScore = (a, b) => {
+  a = a.toLowerCase().trim(); b = b.toLowerCase().trim();
+  if (a === b) return 100;
+  const longer = a.length > b.length ? a : b;
+  return Math.max(0, Math.round((1 - levenshtein(longer, a.length > b.length ? b : a) / longer.length) * 100));
+};
+
+const startRecording = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("이 브라우저는 음성 인식을 지원하지 않아요 (Chrome 권장)"); return; }
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.onstart = () => { setIsRecording(true); setRecResult(null); };
+  rec.onresult = e => {
+    const text = e.results[0][0].transcript;
+    setRecResult({ text, score: calcScore(text, w.english) });
+    setIsRecording(false);
+  };
+  rec.onerror = () => setIsRecording(false);
+  rec.onend = () => setIsRecording(false);
+  rec.start();
+};
+
+
   useEffect(() => {
+    setFlipped(false); setIsRepeating(false); 
+  setRecResult(null); // 추가
     if (isRepeating) {
       speak(w.english);
       repeatRef.current = setInterval(() => speak(w.english), 2000);
@@ -316,6 +358,39 @@ function StudyScreen({ words, setName, nav, mode, navTarget }) {
         {w.definition && <div className="mt-3 mb-4"><p className="text-xs font-bold text-gray-400 uppercase mb-1">Definition</p><p className="text-sm text-gray-700 bg-gray-50 rounded-xl p-3 leading-relaxed">{w.definition}</p></div>}
         {exs.length > 0 && <div className="mb-2"><p className="text-xs font-bold text-gray-400 uppercase mb-2">Examples</p><div className="space-y-2">{exs.map((e, i) => <div key={i} className="text-sm text-gray-700 bg-indigo-50 rounded-xl p-3 leading-relaxed"><span className="text-xs text-indigo-400 font-bold mr-1">{i + 1}.</span>{hl(e)}</div>)}</div></div>}
         <SA />
+        {/* 발음 연습 버튼 */}
+<div className="mt-4 pt-3 border-t border-gray-100">
+  <button
+    onClick={startRecording}
+    disabled={isRecording}
+    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all
+      ${isRecording ? "bg-red-100 text-red-500 animate-pulse" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}
+  >
+    🎤 {isRecording ? "Listening..." : "Pronounce it"}
+  </button>
+
+  {recResult && (
+    <div className={`mt-2 px-4 py-3 rounded-xl text-sm ${
+      recResult.score >= 80 ? "bg-emerald-50 border border-emerald-200" :
+      recResult.score >= 50 ? "bg-yellow-50 border border-yellow-200" :
+                              "bg-red-50 border border-red-200"}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-gray-600">"{recResult.text}"</span>
+        <span className={`text-xl font-bold ${
+          recResult.score >= 80 ? "text-emerald-600" :
+          recResult.score >= 50 ? "text-yellow-500" : "text-red-500"}`}>
+          {recResult.score}%
+        </span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+        <div className={`h-1.5 rounded-full transition-all ${
+          recResult.score >= 80 ? "bg-emerald-500" :
+          recResult.score >= 50 ? "bg-yellow-400" : "bg-red-400"}`}
+          style={{ width: `${recResult.score}%` }} />
+      </div>
+    </div>
+  )}
+</div>
       </Card>
       <NV cls="mt-4" />
     </div>
