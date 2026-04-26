@@ -6,12 +6,19 @@ const pick = (a, n) => shuffle(a).slice(0, n);
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 const speak = (text, lang = "en-US") => {
-  if ('speechSynthesis' in window) {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang; u.rate = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
-  }
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  u.rate = 1.0;
+
+  const voices = window.speechSynthesis.getVoices();
+  const engVoice = voices.find(v => v.lang === "en-US" && v.name.includes("Google"))
+    || voices.find(v => v.lang === "en-US")
+    || voices.find(v => v.lang.startsWith("en"));
+  if (engVoice) u.voice = engVoice;
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
 };
 
 function useOrientation() {
@@ -863,6 +870,8 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showReset, setShowReset] = useState(false);
+
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 
   useEffect(() => {
     (async () => {
