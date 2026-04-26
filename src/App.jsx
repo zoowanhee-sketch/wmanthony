@@ -633,13 +633,6 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
     </div>
   )}
 </div>
-<div style={{ minHeight: "48px" }}>
-  {!checked
-    ? <Btn onClick={check} disabled={q.opts ? !selected : !typed.trim()} size="lg" className="w-full">Check</Btn>
-    : checked.correct
-      ? <p className="text-center text-sm text-gray-400 py-3">Moving on...</p>
-      : <Btn onClick={next} size="lg" className="w-full">Next →</Btn>}
-</div>
           {q.opts
             ? <div className="space-y-2">{q.opts.map(opt => { let cls = "border-gray-200 bg-white text-gray-800 hover:border-indigo-300"; if (checked) { if (opt === q.ans) cls = "border-emerald-400 bg-emerald-50 text-emerald-800"; else if (opt === selected) cls = "border-red-400 bg-red-50 text-red-700"; } else if (selected === opt) cls = "border-indigo-500 bg-indigo-50 text-indigo-700"; return <button key={opt} onClick={() => !checked && setSelected(opt)} className={`w-full py-2.5 px-4 rounded-xl border text-sm font-medium text-left transition-all ${cls}`}>{opt}</button>; })}</div>
             : <input autoFocus value={typed} onChange={e => !checked && setTyped(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { checked ? next() : check(); } }} disabled={!!checked} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Type the word..." />}
