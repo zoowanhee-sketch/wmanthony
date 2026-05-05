@@ -455,7 +455,10 @@ function ResultsScreen({ wrongIds, words, setName, score, correct, total, config
 
       <div className="space-y-2">
         {wrongWords.length > 0 && <>
-          <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 1, navTarget: "home" })} size="lg" className="w-full">📖 Study Wrong Words</Btn>
+          <div className="flex gap-2">
+  <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 1, navTarget: "home" })} size="lg" className="flex-1">📖 Study 1</Btn>
+  <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 2, navTarget: "home" })} size="lg" variant="secondary" className="flex-1">🔤 Study 2</Btn>
+</div>
           {wrongWords.length >= 2 && <Btn onClick={() => nav("quiz_setup", { words: wrongWords, setName: "Wrong Words", allWords: words })} size="lg" className="w-full">▶ Quiz Wrong Words</Btn>}
         </>}
         <Btn onClick={() => nav("quiz_setup", { words, setName, allWords: words })} variant="secondary" className="w-full">🔁 Try Again</Btn>
@@ -602,7 +605,27 @@ function QuizSetupScreen({ words, setName, allWords, nav }) {
 
 /* ── Quiz Screen ── */
 function QuizScreen({ words, setName, allWords, config, nav, saveHistory, updateWeakWords }) {
-  const [questions] = useState(() => buildQuestions(words, allWords, config.type, config.diff));
+  const SAVE_KEY = "voca_quiz_progress";
+
+const getSaved = () => {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(SAVE_KEY));
+    if (!s || s.setName !== setName || s.type !== config.type || s.diff !== config.diff) return null;
+    if (s.wordIds?.join() !== words.map(w => w.id).join()) return null;
+    return s;
+  } catch { return null; }
+};
+
+const saveProgress = (bi, qi, allR) => {
+  try {
+    sessionStorage.setItem(SAVE_KEY, JSON.stringify({
+      questions, setName, type: config.type, diff: config.diff,
+      wordIds: words.map(w => w.id),
+      batchIdx: bi, qIdx: qi, allResults: allR,
+    }));
+  } catch {}
+};
+  const [questions] = useState(() => getSaved()?.questions || buildQuestions(words, allWords, config.type, config.diff));
   const batches = useMemo(() => {
     if (!questions?.length) return [];
     const r = []; let c = [];
@@ -611,14 +634,14 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
     return r;
   }, [questions]);
 
-  const [batchIdx, setBatchIdx] = useState(0);
-  const [qIdx, setQIdx] = useState(0);
+  const [batchIdx, setBatchIdx] = useState(() => getSaved()?.batchIdx || 0);
+const [qIdx, setQIdx] = useState(() => getSaved()?.qIdx || 0);
   const [selected, setSelected] = useState(null);
   const [typed, setTyped] = useState("");
   const [checked, setChecked] = useState(null);
   const [batchSummary, setBatchSummary] = useState(null);
-  const allRef = useRef([]);
-  const batchRef = useRef([]);
+const allRef = useRef(getSaved()?.allResults || []);
+const batchRef = useRef([]);
 
   if (!questions || !batches.length) return (
     <div className="max-w-2xl mx-auto px-4 py-12 text-center">
@@ -634,7 +657,8 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
   const doneQ = batches.slice(0, batchIdx).reduce((s, b) => s + b.length, 0) + qIdx;
 
   const finishQuiz = async allR => {
-    const total = allR.length; if (!total) return;
+  sessionStorage.removeItem(SAVE_KEY); // 추가
+  const total = allR.length; if (!total) return;
     const correct = allR.filter(r => r.correct).length;
     const wrongIds = [...new Set(allR.filter(r => !r.correct && r.wid).map(r => r.wid))];
     const score = Math.round(correct / total * 100);
@@ -662,11 +686,27 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
     const wrongWids = [...new Set(batchR.filter(r => !r.correct && r.wid).map(r => r.wid))];
     setBatchSummary({ batchNum: batchIdx + 1, totalBatches: batches.length, correct: batchR.filter(r => r.correct).length, total: batchR.length, wrongWords: words.filter(w => wrongWids.includes(w.id)) });
   };
-  const advQ = (batchR, qi, bat) => { batchRef.current = batchR; if (qi < bat.length - 1) { setQIdx(qi + 1); setSelected(null); setTyped(""); setChecked(null); } else finishBatch(batchR); };
+  const advQ = (batchR, qi, bat) => {
+  batchRef.current = batchR;
+  if (qi < bat.length - 1) {
+    const nextQi = qi + 1;
+    setQIdx(nextQi);
+    saveProgress(batchIdx, nextQi, allRef.current);
+    setSelected(null); setTyped(""); setChecked(null);
+  } else finishBatch(batchR);
+};
   const handleMatchDone = res => finishBatch([...batchRef.current, ...res]);
   const check = () => { if (!q) return; const ua = q.opts ? selected : typed.trim().toLowerCase(); const correct = ua === q.ans.toLowerCase(); setChecked({ correct, ua }); if (correct) { const qi = qIdx; const bat = cb; const bR = [...batchRef.current, { wid: q.wid, correct: true }]; setTimeout(() => advQ(bR, qi, bat), 1000); } };
   const next = () => { if (!checked) return; const bR = [...batchRef.current, { wid: q.wid, correct: checked.correct }]; advQ(bR, qIdx, cb); };
-  const continueBatch = () => { batchRef.current = []; setBatchSummary(null); setBatchIdx(i => i + 1); setQIdx(0); setSelected(null); setTyped(""); setChecked(null); };
+  const continueBatch = () => {
+  batchRef.current = [];
+  setBatchSummary(null);
+  const nextBatch = batchIdx + 1;
+  setBatchIdx(nextBatch);
+  setQIdx(0);
+  saveProgress(nextBatch, 0, allRef.current);
+  setSelected(null); setTyped(""); setChecked(null);
+};
 
   if (batchSummary) {
     const { batchNum, totalBatches, correct, total, wrongWords } = batchSummary;
@@ -696,7 +736,7 @@ function QuizScreen({ words, setName, allWords, config, nav, saveHistory, update
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => nav("home")} className="text-2xl text-gray-400">←</button>
+        <button onClick={() => { sessionStorage.removeItem(SAVE_KEY); nav("home"); }} className="text-2xl text-gray-400">←</button>
         <div className="flex-1">
           <div className="flex justify-between text-xs text-gray-400 mb-1"><span>{q.label} · Round {batchIdx + 1}/{batches.length}</span><span>{doneQ + 1}/{totalQ}</span></div>
           <ProgressBar value={doneQ + 1} max={totalQ} />
@@ -774,7 +814,8 @@ function DashboardScreen({ history, weakWords, nav, allWrongWords }) {
             <div><p className="font-semibold text-gray-700">📌 All Wrong Words</p><p className="text-xs text-gray-400">{allWrongWords.length} words across all sessions</p></div>
           </div>
           <div className="flex gap-2">
-            <Btn onClick={() => nav("study", { words: allWrongWords, setName: "All Wrong Words", mode: 1, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">📖 Study</Btn>
+            <Btn onClick={() => nav("study", { words: allWrongWords, setName: "All Wrong Words", mode: 1, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">📖 Study 1</Btn>
+<Btn onClick={() => nav("study", { words: allWrongWords, setName: "All Wrong Words", mode: 2, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">🔤 Study 2</Btn>
             {allWrongWords.length >= 2 && <Btn onClick={() => nav("quiz_setup", { words: allWrongWords, setName: "All Wrong Words", allWords: allWrongWords })} size="sm" className="flex-1">▶ Quiz</Btn>}
           </div>
         </Card>
@@ -828,7 +869,8 @@ function DashboardScreen({ history, weakWords, nav, allWrongWords }) {
                         ))}
                       </div>
                       <div className="flex gap-2">
-                        <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 1, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">📖 Study</Btn>
+                        <Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 1, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">📖 Study 1</Btn>
+<Btn onClick={() => nav("study", { words: wrongWords, setName: "Wrong Words", mode: 2, navTarget: "dashboard" })} size="sm" variant="secondary" className="flex-1">🔤 Study 2</Btn>
                         {wrongWords.length >= 2 && <Btn onClick={() => nav("quiz_setup", { words: wrongWords, setName: "Wrong Words Review", allWords: wrongWords })} size="sm" className="flex-1">▶ Quiz</Btn>}
                       </div>
                     </div>
@@ -961,3 +1003,8 @@ export default function App() {
     </div>
   );
 }
+
+
+'git add .'
+'git commit -m "fix: updateWeakWords 중복 코드 제거"'
+'git push'

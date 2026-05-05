@@ -1,6 +1,6 @@
 const uid = () => Math.random().toString(36).slice(2, 9);
 const W = (e, k, d, exs=[], sy=[], an=[]) => ({
-  id: uid(), english: e, korean: k, definition: d,
+  id: e.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z_]/g, ''), english: e, korean: k, definition: d,
   exampleSentences: exs,
   exampleSentence: exs[0] || "",
   synonyms: sy, antonyms: an
